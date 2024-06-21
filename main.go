@@ -53,6 +53,7 @@ func main() {
 				Action: version,
 			},
 		},
+		Action: execute(workspace | window | monitor),
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "socket",
@@ -75,8 +76,8 @@ func main() {
 	}
 }
 
-func execute(entity entity) cli.ActionFunc {
-	logger := logger.With("entity", entity)
+func execute(ent entity) cli.ActionFunc {
+	logger := logger.With("entity", ent)
 
 	return func(ctx *cli.Context) error {
 		if ctx.Bool("debug") {
@@ -106,7 +107,21 @@ func execute(entity entity) cli.ActionFunc {
 				continue
 			}
 
-			fmt.Println(raw)
+			rawsplit := strings.Split(raw, ">>")
+			ev, data := rawsplit[0], strings.TrimRight(rawsplit[1], "\n")
+
+			event, err := FindEvent(ev)
+			if err != nil {
+				logger.Debug("unsupported event", "event", ev, "error", err)
+				continue
+			}
+
+			if !event.HasEntity(ent) {
+				logger.Debug("event does not belong to entity", "event", event)
+				continue
+			}
+
+			fmt.Println(event, ":", data)
 		}
 	}
 }

@@ -1,65 +1,40 @@
 package main
 
-import "fmt"
-
-type entity string
-
-const (
-	workspace entity = "workspace"
-	window    entity = "window"
-	monitor   entity = "monitor"
+import (
+	"fmt"
+	"strings"
 )
 
-func (e entity) Support(ev event) error {
-	if ev.IsValid() {
-		return fmt.Errorf("invalid event %q", ev)
+type entity byte
+
+const (
+	workspace entity = 1 << iota
+	window
+	monitor
+	maxKey
+)
+
+func (e entity) String() string {
+	if e >= maxKey {
+		return fmt.Sprintf("unknown entity %d", e)
 	}
 
-	events, err := e.Events()
-	if err != nil {
-		return err
+	switch e {
+	case workspace:
+		return "workspace"
+	case window:
+		return "window"
+	case monitor:
+		return "monitor"
 	}
 
-	for _, sev := range events {
-		if sev == ev {
-			return nil
+	// multiple
+	var entities []string
+	for entity := workspace; entity < maxKey; entity <<= 1 {
+		if e&entity != 0 {
+			entities = append(entities, entity.String())
 		}
 	}
 
-	return fmt.Errorf("unsupported event %q for entity", ev)
-}
-
-func (e entity) Events() ([]event, error) {
-	switch e {
-	case workspace:
-		return []event{
-			workspaceChanged,
-			workspaceCreated,
-			workspaceDestroyed,
-			workspaceMoved,
-			workspaceUrgent,
-		}, nil
-	case window:
-		return []event{
-			activeWindow,
-			windowOpened,
-			windowClosed,
-			windowMoved,
-			windowMinimized,
-			windowTitle,
-			windowFullscreen,
-		}, nil
-	case monitor:
-		return []event{
-			monitorFocused,
-			monitorAdded,
-			monitorRemoved,
-		}, nil
-	default:
-		return nil, fmt.Errorf("no event defined for entity %q", e)
-	}
-}
-
-func (e entity) String() string {
-	return string(e)
+	return strings.Join(entities, "|")
 }
