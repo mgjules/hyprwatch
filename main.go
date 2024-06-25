@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"strings"
+	"syscall"
 
 	"github.com/urfave/cli/v2"
 )
@@ -73,7 +74,7 @@ func main() {
 		},
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
 	if err := app.RunContext(ctx, os.Args); err != nil {
@@ -107,35 +108,40 @@ func execute(ent entity) cli.ActionFunc {
 
 		reader := bufio.NewReader(conn)
 		for {
-			raw, err := reader.ReadString('\n')
-			if err != nil {
-				logger.Error("cannot read raw string", "error", err)
-				continue
+			select {
+			case <-ctx.Done():
+				return cli.Exit("application closed", 0)
+			default:
+				raw, err := reader.ReadString('\n')
+				if err != nil {
+					logger.Error("cannot read raw string", "error", err)
+					continue
+				}
+
+				logger.Debug("received event", "raw", raw)
+
+				rawsplit := strings.Split(raw, ">>")
+				ev, data := rawsplit[0], strings.TrimRight(rawsplit[1], "\n")
+
+				event, err := FindEvent(ev)
+				if err != nil {
+					logger.Debug("unsupported event", "event", ev, "error", err)
+					continue
+				}
+
+				if !event.HasEntity(ent) {
+					logger.Debug("event does not belong to entity", "event", event)
+					continue
+				}
+
+				b, err := json.Marshal(ParseEvent(event, data))
+				if err != nil {
+					logger.Debug("event cannot be formatted to json", "event", event, "raw_data", data)
+					continue
+				}
+
+				fmt.Println(string(b))
 			}
-
-			logger.Debug("received event", "raw", raw)
-
-			rawsplit := strings.Split(raw, ">>")
-			ev, data := rawsplit[0], strings.TrimRight(rawsplit[1], "\n")
-
-			event, err := FindEvent(ev)
-			if err != nil {
-				logger.Debug("unsupported event", "event", ev, "error", err)
-				continue
-			}
-
-			if !event.HasEntity(ent) {
-				logger.Debug("event does not belong to entity", "event", event)
-				continue
-			}
-
-			b, err := json.Marshal(ParseEvent(event, data))
-			if err != nil {
-				logger.Debug("event cannot be formatted to json", "event", event, "raw_data", data)
-				continue
-			}
-
-			fmt.Println(string(b))
 		}
 	}
 }
