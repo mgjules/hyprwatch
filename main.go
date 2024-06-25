@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"runtime/debug"
 	"strings"
 
@@ -70,7 +73,10 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer stop()
+
+	if err := app.RunContext(ctx, os.Args); err != nil {
 		logger.Error("encountered an application error: %v", "error", err)
 		os.Exit(1)
 	}
@@ -107,6 +113,8 @@ func execute(ent entity) cli.ActionFunc {
 				continue
 			}
 
+			logger.Debug("received event", "raw", raw)
+
 			rawsplit := strings.Split(raw, ">>")
 			ev, data := rawsplit[0], strings.TrimRight(rawsplit[1], "\n")
 
@@ -121,7 +129,13 @@ func execute(ent entity) cli.ActionFunc {
 				continue
 			}
 
-			fmt.Println(event, ":", data)
+			b, err := json.Marshal(ParseEvent(event, data))
+			if err != nil {
+				logger.Debug("event cannot be formatted to json", "event", event, "raw_data", data)
+				continue
+			}
+
+			fmt.Println(string(b))
 		}
 	}
 }
