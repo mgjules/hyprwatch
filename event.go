@@ -72,6 +72,14 @@ var events = []event{
 	{name: "fullscreen", entity: window, format: []formatField{
 		{name: "window_fullscreened", typ: formatTypeBoolean},
 	}},
+	{name: "changefloatingmode", entity: window, format: []formatField{
+		{name: "window_address", typ: formatTypeString},
+		{name: "window_floating", typ: formatTypeBoolean},
+	}},
+	{name: "pin", entity: window, format: []formatField{
+		{name: "window_address", typ: formatTypeString},
+		{name: "window_pinned", typ: formatTypeBoolean},
+	}},
 	{name: "focusedmon", entity: monitor, format: []formatField{
 		{name: "monitor_name", typ: formatTypeString},
 		{name: "workspace_name", typ: formatTypeString},
@@ -109,7 +117,7 @@ func ParseEvent(ev event, data string) map[string]any {
 		case formatTypeInt:
 			v, err := strconv.Atoi(raw)
 			if err != nil {
-				val = "#ERROR_INT"
+				val = raw + "#ERROR_INT"
 				break
 			}
 			val = v
@@ -118,7 +126,7 @@ func ParseEvent(ev event, data string) map[string]any {
 		case formatTypeBoolean:
 			v, err := strconv.ParseBool(raw)
 			if err != nil {
-				val = "#ERROR_BOOL"
+				val = raw + "#ERROR_BOOL"
 				break
 			}
 			val = v
